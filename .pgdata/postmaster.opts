@@ -1,0 +1,1 @@
+/home/jorge/Documentos/A2 tecnologia/node_modules/@embedded-postgres/linux-x64/native/bin/postgres "-D" "/home/jorge/Documentos/A2 tecnologia/.pgdata"

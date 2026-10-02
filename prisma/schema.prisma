@@ -1,0 +1,613 @@
+// ============================================================================
+//  A2 TECNOLOGÍA - Esquema de base de datos
+//  Sistema de gestión para empresa de servicios de Internet / Wi-Fi
+//  Moneda: pesos colombianos (COP)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+//  CONFIGURACIÓN GLOBAL
+// ---------------------------------------------------------------------------
+
+/// Datos de la empresa y parámetros del negocio (tabla de una sola fila).
+model Config {
+  id             Int      @id @default(1)
+  nombreEmpresa  String   @default("A2 Tecnología") @map("nombre_empresa")
+  nit            String?  @map("nit")
+  telefono       String?
+  direccion      String?
+  email          String?
+
+  /// Parte fija de cada pago que corresponde a la empresa (por defecto 40.000 COP).
+  montoEmpresa   Int      @default(40000) @map("monto_empresa")
+  /// Nombre de esa parte, para mostrarlo claro en reportes.
+  conceptoEmpresa String  @default("Parte empresa") @map("concepto_empresa")
+  /// Etiqueta de la ganancia del dueño.
+  conceptoDueno  String   @default("Ganancia del dueño") @map("concepto_dueno")
+
+  /// Número consecutivo del próximo recibo de pago.
+  consecutiveRecibo Int   @default(1) @map("consecutivo_recibo")
+
+  /// Días deTolerance antes de marcar un periodo como atrasado.
+  diasGracia     Int      @default(5) @map("dias_gracia")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+}
+
+// ---------------------------------------------------------------------------
+//  USUARIOS  (sistema de un solo usuario administrador)
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id           String   @id @default(cuid())
+  nombre       String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+}
+
+// ---------------------------------------------------------------------------
+//  PLANES
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id             String   @id @default(cuid())
+  nombre         String
+  velocidadBajada String?  @map("velocidad_bajada") // "20 Mbps"
+  velocidadSubida String?  @map("velocidad_subida")
+  valorMensual   Int      @map("valor_mensual") // en COP
+  descripcion    String?
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  clientes Cliente[]
+
+  @@index([activo])
+}
+
+// ---------------------------------------------------------------------------
+//  CLIENTES  (entidad central del sistema)
+// ---------------------------------------------------------------------------
+
+enum EstadoCliente {
+  ACTIVO
+  SUSPENDIDO
+  INACTIVO
+  DESMONTADO
+}
+
+enum FrecuenciaPago {
+  MENSUAL
+  QUINCENAL
+}
+
+model Cliente {
+  id           String   @id @default(cuid())
+  nombre       String
+  documento    String?
+  telefono     String?
+  direccion    String?
+  zona         String?
+  barrio       String?
+  email        String?
+  notas        String?
+
+  planId       String?  @map("plan_id")
+  plan         Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  frecuencia   FrecuenciaPago @default(MENSUAL)
+  /// Valor de la cuota según su frecuencia (puede diferir del plan).
+  valorCuota   Int      @default(0) @map("valor_cuota")
+
+  ip           String?
+  mac          String?
+  equipoDesc   String?  @map("equipo_desc") // Router / ONT / CPE
+
+  fechaInstalacion DateTime? @map("fecha_instalacion")
+  fechaActivacion  DateTime? @map("fecha_activacion")
+  /// Base para generar los periodos de facturación.
+  fechaInicioPago  DateTime? @map("fecha_inicio_pago")
+
+  estado       EstadoCliente @default(ACTIVO)
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  periodos     Periodo[]
+  pagos        Pago[]
+  instalaciones Instalacion[]
+  revisiones   Revision[]
+  desmontes    Desmonte[]
+  transacciones Transaccion[]
+
+  @@index([estado])
+  @@index([nombre])
+  @@index([planId])
+}
+
+// ---------------------------------------------------------------------------
+//  PAGOS  (periodos de facturación + pagos aplicados)
+// ---------------------------------------------------------------------------
+
+enum EstadoPeriodo {
+  PENDIENTE
+  PAGADO
+  PARCIAL
+  /// Vencido y sin pagar.
+  ATRASADO
+  /// Periodo futuro, aún no vigente.
+  FUTURO
+  /// El cliente fue desconectado; no se cobra.
+  ANULADO
+  /// Cobro exonerado (bonificación, cortes, etc.)
+  EXONERADO
+}
+
+model Periodo {
+  id           String   @id @default(cuid())
+  clienteId    String   @map("cliente_id")
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  /// Identificador del corte. Ej: "2026-01" (mensual) o "2026-01-Q1" (quincenal).
+  codigo       String
+  /// Número consecutivo dentro del año: 1-12 mensual, 1-24 quincenal.
+  numero       Int
+  anio         Int
+  /// Quincena 1 o 2; sólo para frecuencia quincenal.
+  quincena     Int?
+
+  fechaInicio  DateTime @map("fecha_inicio")
+  fechaVencimiento DateTime @map("fecha_vencimiento")
+
+  monto        Int
+  /// Saldo pendiente tras aplicar pagos.
+  saldo        Int      @default(0)
+  /// Total aplicado de pagos.
+  pagado       Int      @default(0)
+
+  estado       EstadoPeriodo @default(PENDIENTE)
+  fechaPago    DateTime?    @map("fecha_pago")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  aplicaciones AplicacionPago[]
+
+  @@unique([clienteId, codigo])
+  @@index([clienteId])
+  @@index([estado])
+  @@index([fechaVencimiento])
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+  NEQUI
+  DAVIPLATA
+  WOMPI
+  OTRO
+}
+
+model Pago {
+  id           String   @id @default(cuid())
+  clienteId    String   @map("cliente_id")
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  fecha        DateTime @default(now())
+  monto        Int
+  metodo       MetodoPago @default(EFECTIVO)
+  referencia   String?
+  concepto     String?
+  nota         String?
+
+  /// Reparto de ingresos: parte fija para la empresa y resto para el dueño.
+  montoEmpresa Int      @default(0) @map("monto_empresa")
+  montoDueno   Int      @default(0) @map("monto_dueno")
+
+  /// Numero de recibo impreso.
+  numeroRecibo Int?     @map("numero_recibo")
+
+  /// Permite anular un pago mal registrado sin borrarlo.
+  anulado      Boolean  @default(false)
+  anuladoMotivo String? @map("anulado_motivo")
+  anuladoEn    DateTime? @map("anulado_en")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  aplicaciones AplicacionPago[]
+
+  @@index([clienteId])
+  @@index([fecha])
+}
+
+/// Puente: un pago puede cubrir varios periodos (pago de 2 meses).
+model AplicacionPago {
+  id        String  @id @default(cuid())
+  pagoId    String  @map("pago_id")
+  pago      Pago    @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  periodoId String  @map("periodo_id")
+  periodo   Periodo @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  monto     Int
+
+  @@unique([pagoId, periodoId])
+  @@index([periodoId])
+}
+
+// ---------------------------------------------------------------------------
+//  INSTALACIONES
+// ---------------------------------------------------------------------------
+
+enum TipoInstalacion {
+  NUEVA
+  REINSTALACION
+  TRASLADO
+  CAMBIO_PLAN
+}
+
+enum EstadoInstalacion {
+  PENDIENTE
+  PROGRAMADA
+  EN_PROCESO
+  COMPLETADA
+  CANCELADA
+}
+
+model Instalacion {
+  id           String   @id @default(cuid())
+  clienteId    String   @map("cliente_id")
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  fecha        DateTime @default(now())
+  fechaProgramada DateTime? @map("fecha_programada")
+  fechaCompletada DateTime? @map("fecha_completada")
+
+  tipo         TipoInstalacion @default(NUEVA)
+  estado       EstadoInstalacion @default(PENDIENTE)
+
+  zona         String?
+  direccion    String?
+  referencia   String?
+  telefono     String?
+
+  planId       String?  @map("plan_id")
+  valorInstalacion Int  @default(0) @map("valor_instalacion")
+  /// Mano de obra cobrada aparte.
+  manoObra     Int      @default(0) @map("mano_obra")
+
+  routerDesc   String?  @map("router_desc")
+  mac          String?
+  ip           String?
+  longitudCable Float?  @map("longitud_cable")
+  torre        String?
+
+  observacion  String?
+  recibidoPor  String?  @map("recibido_por")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  materiales   MaterialUsado[]
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+// ---------------------------------------------------------------------------
+//  REVISIONES
+// ---------------------------------------------------------------------------
+
+enum TipoRevision {
+  RUTINA
+  CORRECTIVA
+  INSTALACION
+  REACTIVACION
+  OTRO
+}
+
+enum EstadoRevision {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADA
+  CANCELADA
+}
+
+model Revision {
+  id           String   @id @default(cuid())
+  clienteId    String   @map("cliente_id")
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  fecha        DateTime @default(now())
+  tipo         TipoRevision @default(RUTINA)
+  estado       EstadoRevision @default(PENDIENTE)
+
+  motivo       String?
+  diagnostico  String?
+  solucion     String?
+  duracionMin  Int?     @map("duracion_min")
+
+  senalDbm     Float?   @map("senal_dbm")
+  velocidadBajada String? @map("velocidad_bajada")
+  velocidadSubida String? @map("velocidad_subida")
+
+  valorCobrado Int      @default(0) @map("valor_cobrado")
+  proximaRevision DateTime? @map("proxima_revision")
+  observacion  String?
+  tecnico      String?
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  materiales   MaterialUsado[]
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+// ---------------------------------------------------------------------------
+//  DESMONTES
+// ---------------------------------------------------------------------------
+
+enum MotivoDesmonte {
+  NO_PAGO
+  RENUNCIA
+  FALLA
+  CAMBIO_PLAN
+  INACTIVO
+  TRASLADO
+  OTRO
+}
+
+enum EstadoEquipo {
+  FUNCIONAL
+  DANADO
+  NO_APORTA
+  PERDIDO
+}
+
+model Desmonte {
+  id           String   @id @default(cuid())
+  clienteId    String   @map("cliente_id")
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  fecha        DateTime @default(now())
+  motivo       MotivoDesmonte @default(NO_PAGO)
+  estado       EstadoInstalacion @default(PENDIENTE)
+
+  direccion    String?
+  zona         String?
+  routerDesc   String?  @map("router_desc")
+  mac          String?
+
+  /// Saldo a favor del cliente (dinero no cobrado que hay que devolver).
+  saldoFavor   Int      @default(0) @map("saldo_favor")
+  /// Valor de los equipos recuperados (se registra como ingreso).
+  valorEquipos Int      @default(0) @map("valor_equipos")
+  /// Ganancia no cobrada que la empresa se queda.
+  gananciaNoCobrada Int @default(0) @map("ganancia_no_cobrada")
+
+  observacion  String?
+  tecnico      String?
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  equipos      EquipoRetirado[]
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+model EquipoRetirado {
+  id           String   @id @default(cuid())
+  desmonteId   String   @map("desmonte_id")
+  desmonte     Desmonte @relation(fields: [desmonteId], references: [id], onDelete: Cascade)
+
+  tipo         String
+  marca        String?
+  modelo       String?
+  mac          String?
+  estado       EstadoEquipo @default(FUNCIONAL)
+  valor        Int      @default(0)
+  nota         String?
+}
+
+// ---------------------------------------------------------------------------
+//  MATERIALES USADOS  (instalaciones y revisiones)
+// ---------------------------------------------------------------------------
+
+model MaterialUsado {
+  id         String   @id @default(cuid())
+  /// Origen: instalacionId, revisionId o null si es un ajuste manual.
+  instalacionId String? @map("instalacion_id")
+  instalacion   Instalacion? @relation(fields: [instalacionId], references: [id], onDelete: Cascade)
+
+  revisionId  String?  @map("revision_id")
+  revision    Revision? @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  itemId      String   @map("item_id")
+  item        ItemInventario @relation(fields: [itemId], references: [id])
+
+  cantidad    Float
+  costoUnitario Int    @map("costo_unitario")
+  total       Int
+  nota        String?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([instalacionId])
+  @@index([revisionId])
+  @@index([itemId])
+}
+
+// ---------------------------------------------------------------------------
+//  INVENTARIO
+// ---------------------------------------------------------------------------
+
+enum UnidadMedida {
+  UNIDAD
+  METRO
+  CAJA
+  ROLLO
+  KG
+  PAQUETE
+}
+
+model CategoriaInventario {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  items       ItemInventario[]
+}
+
+model ItemInventario {
+  id             String   @id @default(cuid())
+  nombre         String
+  categoriaId    String   @map("categoria_id")
+  categoria      CategoriaInventario @relation(fields: [categoriaId], references: [id])
+
+  codigo         String?  @unique
+  marca          String?
+  modelo         String?
+  descripcion    String?
+  ubicacion      String?
+
+  stock          Float    @default(0)
+  stockMinimo    Float    @default(0) @map("stock_minimo")
+  unidad         UnidadMedida @default(UNIDAD)
+
+  costoUnitario  Int      @default(0) @map("costo_unitario")
+  precioVenta    Int      @default(0) @map("precio_venta")
+  proveedor      String?
+
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  movimientos    MovimientoInventario[]
+  usados         MaterialUsado[]
+
+  @@index([categoriaId])
+  @@index([nombre])
+  @@index([activo])
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  DEVOLUCION
+}
+
+/// Origen del movimiento: desde qué módulo del sistema se generó.
+enum OrigenMovimiento {
+  MANUAL
+  COMPRA
+  INSTALACION
+  REVISION
+  DESMONTE
+  VENTA
+}
+
+model MovimientoInventario {
+  id        String   @id @default(cuid())
+  itemId    String   @map("item_id")
+  item      ItemInventario @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  tipo      TipoMovimiento
+  origen    OrigenMovimiento @default(MANUAL)
+  /// Id del registro origen (instalación, revisión, etc.)
+  origenId  String?  @map("origen_id")
+
+  cantidad  Float
+  /// Negativo para salidas.
+  delta     Float
+  costoUnitario Int  @map("costo_unitario")
+  total     Int
+  stockResultante Float @map("stock_resultante")
+
+  fecha     DateTime @default(now())
+  motivo    String?
+  nota      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([itemId])
+  @@index([fecha])
+  @@index([origen, origenId])
+}
+
+// ---------------------------------------------------------------------------
+//  CONTABILIDAD
+// ---------------------------------------------------------------------------
+
+enum TipoTransaccion {
+  INGRESO
+  EGRESO
+}
+
+model CategoriaTransaccion {
+  id          String   @id @default(cuid())
+  nombre      String
+  tipo        TipoTransaccion
+  color       String   @default("#64748b")
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  transacciones Transaccion[]
+
+  @@unique([nombre, tipo])
+}
+
+model Transaccion {
+  id           String   @id @default(cuid())
+  fecha        DateTime @default(now())
+  tipo         TipoTransaccion
+  categoriaId  String   @map("categoria_id")
+  categoria    CategoriaTransaccion @relation(fields: [categoriaId], references: [id])
+
+  concepto     String
+  monto        Int
+
+  /// Cliente relacionado, si aplica.
+  clienteId    String?  @map("cliente_id")
+  cliente      Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  /// Pago que originó esta transacción (ingresos automáticos).
+  pagoId       String?  @unique @map("pago_id")
+
+  /// Reparto del ingreso: parte empresa / ganancia del dueño.
+  montoEmpresa Int      @default(0) @map("monto_empresa")
+  montoDueno   Int      @default(0) @map("monto_dueno")
+
+  metodo       String?
+  comprobante  String?
+  observacion  String?
+  /// Marca las transacciones generadas automáticamente por el sistema.
+  automatica   Boolean  @default(false)
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([fecha])
+  @@index([tipo])
+  @@index([categoriaId])
+  @@index([clienteId])
+}

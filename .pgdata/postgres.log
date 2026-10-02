@@ -1,0 +1,40 @@
+2026-09-30 23:21:35.506 -05 [178223] LOG:  starting PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-09-30 23:21:35.506 -05 [178223] LOG:  listening on IPv6 address "::1", port 5433
+2026-09-30 23:21:35.506 -05 [178223] LOG:  could not bind IPv6 address "::1": Address already in use
+2026-09-30 23:21:35.506 -05 [178223] HINT:  Is another postmaster already running on port 5433? If not, wait a few seconds and retry.
+2026-09-30 23:21:35.506 -05 [178223] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-09-30 23:21:35.507 -05 [178223] LOG:  could not bind IPv4 address "127.0.0.1": Address already in use
+2026-09-30 23:21:35.507 -05 [178223] HINT:  Is another postmaster already running on port 5433? If not, wait a few seconds and retry.
+2026-09-30 23:21:35.510 -05 [178223] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5433"
+2026-09-30 23:21:35.514 -05 [178226] LOG:  database system was shut down at 2026-09-30 23:21:28 -05
+2026-09-30 23:21:35.520 -05 [178223] LOG:  database system is ready to accept connections
+2026-09-30 23:21:45.213 -05 [178286] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.216 -05 [178287] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.218 -05 [178288] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.221 -05 [178289] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.348 -05 [178294] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.351 -05 [178295] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.354 -05 [178296] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:21:45.357 -05 [178297] FATAL:  database "a2tecnologia" does not exist
+2026-09-30 23:26:35.614 -05 [178224] LOG:  checkpoint starting: time
+2026-09-30 23:28:28.929 -05 [178224] LOG:  checkpoint complete: wrote 1135 buffers (6.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=113.289 s, sync=0.023 s, total=113.316 s; sync files=422, longest=0.002 s, average=0.001 s; distance=5434 kB, estimate=5434 kB; lsn=0/1A2F780, redo lsn=0/1A2F6F0
+2026-10-01 15:24:18.753 -05 [48732] LOG:  starting PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-10-01 15:24:18.754 -05 [48732] LOG:  listening on IPv6 address "::1", port 5433
+2026-10-01 15:24:18.754 -05 [48732] LOG:  could not bind IPv6 address "::1": Address already in use
+2026-10-01 15:24:18.754 -05 [48732] HINT:  Is another postmaster already running on port 5433? If not, wait a few seconds and retry.
+2026-10-01 15:24:18.754 -05 [48732] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-10-01 15:24:18.754 -05 [48732] LOG:  could not bind IPv4 address "127.0.0.1": Address already in use
+2026-10-01 15:24:18.754 -05 [48732] HINT:  Is another postmaster already running on port 5433? If not, wait a few seconds and retry.
+2026-10-01 15:24:18.758 -05 [48732] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5433"
+2026-10-01 15:24:18.765 -05 [48735] LOG:  database system was interrupted; last known up at 2026-09-30 23:28:28 -05
+2026-10-01 15:24:18.862 -05 [48735] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-10-01 15:24:18.867 -05 [48735] LOG:  redo starts at 0/1A2F6F0
+2026-10-01 15:24:18.867 -05 [48735] LOG:  invalid record length at 0/1A2F830: expected at least 24, got 0
+2026-10-01 15:24:18.867 -05 [48735] LOG:  redo done at 0/1A2F7F8 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2026-10-01 15:24:18.873 -05 [48733] LOG:  checkpoint starting: end-of-recovery immediate wait
+2026-10-01 15:24:18.882 -05 [48733] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.002 s, total=0.011 s; sync files=2, longest=0.002 s, average=0.001 s; distance=0 kB, estimate=0 kB; lsn=0/1A2F830, redo lsn=0/1A2F830
+2026-10-01 15:24:18.886 -05 [48732] LOG:  database system is ready to accept connections
+2026-10-01 15:29:18.982 -05 [48733] LOG:  checkpoint starting: time
+2026-10-01 15:29:22.227 -05 [48733] LOG:  checkpoint complete: wrote 33 buffers (0.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=3.223 s, sync=0.010 s, total=3.245 s; sync files=28, longest=0.004 s, average=0.001 s; distance=77 kB, estimate=77 kB; lsn=0/1A42F58, redo lsn=0/1A42F00
+2026-10-01 15:34:18.327 -05 [48733] LOG:  checkpoint starting: time
+2026-10-01 15:34:20.054 -05 [48733] LOG:  checkpoint complete: wrote 18 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.715 s, sync=0.004 s, total=1.728 s; sync files=16, longest=0.003 s, average=0.001 s; distance=21 kB, estimate=72 kB; lsn=0/1A483B8, redo lsn=0/1A48360
